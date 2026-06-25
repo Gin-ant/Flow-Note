@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Flow Note App</title>
   
-  <!-- This catches errors and prints them to the screen instead of a blank white page -->
   <script>
     window.onerror = function(message, source, lineno, colno, error) {
       document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif;">' +
         '<h2>Oops! Something went wrong.</h2>' +
         '<p><strong>Error:</strong> ' + message + '</p>' +
+        '<p>This usually means a typo or missing bracket happened during copy-pasting.</p>' +
         '</div>';
     };
   </script>
@@ -27,23 +27,32 @@
 
   <style>
     body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    @keyframes pulse-border {
+      0% { border-color: #cbd5e1; }
+      50% { border-color: #3b82f6; }
+      100% { border-color: #cbd5e1; }
+    }
+    .drag-save-btn { animation: pulse-border 2s infinite; }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
-  <!-- Removed data-type="module" to allow it to run perfectly offline on file:/// -->
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
-    // --- Inline SVGs (Replacing Lucide Icons for offline capability) ---
+    // --- Inline SVGs ---
     const Icons = {
       Diamond: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41l-7.59-7.59a2.41 2.41 0 0 0-3.41 0Z"/></svg>,
       Info: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
       Download: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
       Upload: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
       Trash2: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>,
-      PlusCircle: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      PlusCircle: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+      FileJson: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12a1 1 0 0 0-1 1v1a1 1 0 0 1-1 1 1 1 0 0 1 1 1v1a1 1 0 0 0 1 1"/><path d="M14 18a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1 1 1 0 0 1-1-1v-1a1 1 0 0 0-1-1"/></svg>,
+      ZoomIn: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>,
+      ZoomOut: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>,
+      Image: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
     };
 
     // --- Initial Sample Data ---
@@ -52,7 +61,7 @@
       { id: '2', x: 450, y: 50, w: 120, h: 50, text: 'travel', type: 'process' },
       { id: '3', x: 450, y: 150, w: 120, h: 50, text: 'study aboard', type: 'process' },
       { id: '4', x: 450, y: 280, w: 120, h: 60, text: 'making\nbusiness', type: 'process' },
-      { id: '5', x: 190, y: 350, w: 160, h: 90, text: 'mercidysb\nenzes', type: 'decision' },
+      { id: '5', x: 190, y: 320, w: 120, h: 120, text: 'mercidysb\nenzes', type: 'decision' },
     ];
 
     const initialEdges = [
@@ -63,7 +72,7 @@
       { id: 'e5', source: '5', target: '4', text: 'yes' },
     ];
 
-    // --- Math & Geometry Helpers ---
+    // --- Math & Geometry Helpers (Smart Arrow Routing) ---
     function getIntersection(source, target) {
       const cx = target.x + target.w / 2;
       const cy = target.y + target.h / 2;
@@ -108,15 +117,59 @@
       const [editingNodeId, setEditingNodeId] = useState(null);
       const [editingEdgeId, setEditingEdgeId] = useState(null);
       
+      // Pan & Zoom State
+      const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+      const [isPanning, setIsPanning] = useState(false);
+      const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+      
       // Drag, Drop, and Resize State
       const [draggingNodeInfo, setDraggingNodeInfo] = useState(null);
       const [isConnecting, setIsConnecting] = useState(null);
       const [tempMousePos, setTempMousePos] = useState({ x: 0, y: 0 });
       const [isSelectingBox, setIsSelectingBox] = useState(null);
       const [bbResizingInfo, setBbResizingInfo] = useState(null);
+      const [isDraggingOver, setIsDraggingOver] = useState(false);
       
-      const canvasRef = useRef(null);
+      const canvasWrapperRef = useRef(null);
       const fileInputRef = useRef(null);
+      const dragCounter = useRef(0);
+
+      // --- Infinite Panning & Zoom Controls ---
+      useEffect(() => {
+        const wrapper = canvasWrapperRef.current;
+        if (!wrapper) return;
+
+        const handleWheel = (e) => {
+          e.preventDefault();
+          setTransform(prev => {
+            if (e.ctrlKey || e.metaKey) {
+              // Zoom behavior
+              const zoomSensitivity = 0.003;
+              const delta = -e.deltaY * zoomSensitivity;
+              const newScale = Math.min(Math.max(0.1, prev.scale * (1 + delta)), 5);
+              
+              const rect = wrapper.getBoundingClientRect();
+              const cursorX = e.clientX - rect.left;
+              const cursorY = e.clientY - rect.top;
+              
+              const newX = cursorX - (cursorX - prev.x) * (newScale / prev.scale);
+              const newY = cursorY - (cursorY - prev.y) * (newScale / prev.scale);
+              
+              return { x: newX, y: newY, scale: newScale };
+            } else {
+              // Pan behavior
+              return {
+                ...prev,
+                x: prev.x - e.deltaX,
+                y: prev.y - e.deltaY
+              };
+            }
+          });
+        };
+
+        wrapper.addEventListener('wheel', handleWheel, { passive: false });
+        return () => wrapper.removeEventListener('wheel', handleWheel);
+      }, []);
 
       // --- Keyboard Shortcuts ---
       useEffect(() => {
@@ -130,7 +183,7 @@
             setSelectedNodeIds([]);
           }
 
-          // Requirement 2: Hotkey (Shift + Right) to add connected block
+          // Hotkey (Shift + Right) to add connected block
           if (e.key === 'ArrowRight' && e.shiftKey && selectedNodeIds.length === 1) {
             e.preventDefault();
             const sourceNode = nodes.find(n => n.id === selectedNodeIds[0]);
@@ -171,9 +224,22 @@
         a.click();
       };
 
+      const handleDragOutToSave = (e) => {
+        const data = JSON.stringify({ nodes, edges }, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        e.dataTransfer.setData("DownloadURL", `application/json:flownote_save.json:${url}`);
+        e.dataTransfer.effectAllowed = "copy";
+      };
+
       const handleLoad = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        loadFileToCanvas(file);
+        e.target.value = '';
+      };
+
+      const loadFileToCanvas = (file) => {
         const reader = new FileReader();
         reader.onload = (event) => {
           try {
@@ -182,41 +248,63 @@
               setNodes(data.nodes);
               setEdges(data.edges);
               setSelectedNodeIds([]);
+            } else {
+               alert("Invalid flowchart format!");
             }
           } catch (err) {
-            console.error("Invalid file format");
+            alert("Could not read JSON file. Is it formatted correctly?");
           }
         };
         reader.readAsText(file);
-        e.target.value = ''; // Reset
-      };
+      }
 
-      // --- Canvas Interactions ---
+      // --- Canvas Interactions (Logical Space Mapping) ---
       const getCanvasCoords = (e) => {
-        const rect = canvasRef.current.getBoundingClientRect();
+        const rect = canvasWrapperRef.current.getBoundingClientRect();
         return {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
+          x: (e.clientX - rect.left - transform.x) / transform.scale,
+          y: (e.clientY - rect.top - transform.y) / transform.scale
         };
       };
 
       const handleCanvasMouseDown = (e) => {
-        if (e.target !== canvasRef.current) return;
+        if (e.target !== canvasWrapperRef.current) return;
         
-        // Start multi-selection box
-        const coords = getCanvasCoords(e);
-        setIsSelectingBox({
-          startX: coords.x,
-          startY: coords.y,
-          currentX: coords.x,
-          currentY: coords.y
-        });
-        setSelectedNodeIds([]);
-        setEditingNodeId(null);
-        setEditingEdgeId(null);
+        // Right click (2) or Middle click (1) to PAN
+        if (e.button === 2 || e.button === 1) {
+            e.preventDefault();
+            setIsPanning(true);
+            setPanStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
+            return;
+        }
+
+        // Left click to Box Select
+        if (e.button === 0) {
+            const coords = getCanvasCoords(e);
+            setIsSelectingBox({
+                startX: coords.x,
+                startY: coords.y,
+                currentX: coords.x,
+                currentY: coords.y
+            });
+            setSelectedNodeIds([]);
+            setEditingNodeId(null);
+            setEditingEdgeId(null);
+        }
       };
 
       const handleMouseMove = (e) => {
+        // Handle Infinite Panning
+        if (isPanning) {
+            setTransform(prev => ({
+                ...prev,
+                x: e.clientX - panStart.x,
+                y: e.clientY - panStart.y
+            }));
+            return;
+        }
+
+        // All other drags operate in Logical Space
         const coords = getCanvasCoords(e);
         setTempMousePos(coords);
 
@@ -236,8 +324,8 @@
           const dx = coords.x - bbResizingInfo.startX;
           const dy = coords.y - bbResizingInfo.startY;
           
-          const newBbW = Math.max(40, bbResizingInfo.startBB.w + dx);
-          const newBbH = Math.max(40, bbResizingInfo.startBB.h + dy);
+          const newBbW = Math.max(20, bbResizingInfo.startBB.w + dx);
+          const newBbH = Math.max(20, bbResizingInfo.startBB.h + dy);
           const scaleX = newBbW / bbResizingInfo.startBB.w;
           const scaleY = newBbH / bbResizingInfo.startBB.h;
 
@@ -248,8 +336,8 @@
                 ...n,
                 x: bbResizingInfo.startBB.x + (orig.x - bbResizingInfo.startBB.x) * scaleX,
                 y: bbResizingInfo.startBB.y + (orig.y - bbResizingInfo.startBB.y) * scaleY,
-                w: Math.max(20, orig.w * scaleX),
-                h: Math.max(20, orig.h * scaleY),
+                w: Math.max(10, orig.w * scaleX),
+                h: Math.max(10, orig.h * scaleY),
               };
             }
             return n;
@@ -260,6 +348,9 @@
       };
 
       const handleMouseUp = (e) => {
+        if (isPanning) {
+            setIsPanning(false);
+        }
         if (isConnecting) {
           setIsConnecting(null);
         }
@@ -270,7 +361,6 @@
           setBbResizingInfo(null);
         }
         if (isSelectingBox) {
-          // Find all nodes inside the selection box
           const minX = Math.min(isSelectingBox.startX, isSelectingBox.currentX);
           const maxX = Math.max(isSelectingBox.startX, isSelectingBox.currentX);
           const minY = Math.min(isSelectingBox.startY, isSelectingBox.currentY);
@@ -284,18 +374,79 @@
         }
       };
 
-      // --- Drag and Drop from Sidebar ---
+      // --- Drag IN to Load Files, Images AND Drop Shapes ---
+      const handleDragEnterArea = (e) => {
+        e.preventDefault();
+        dragCounter.current += 1;
+        // Only show overlay for actual files dragged from the operating system
+        if (e.dataTransfer.types.includes('Files')) {
+            setIsDraggingOver(true);
+        }
+      };
+
+      const handleDragLeaveArea = (e) => {
+        e.preventDefault();
+        dragCounter.current -= 1;
+        if (dragCounter.current === 0) {
+            setIsDraggingOver(false);
+        }
+      };
+
       const handleDrop = (e) => {
         e.preventDefault();
+        dragCounter.current = 0;
+        setIsDraggingOver(false);
+
+        // Check if files were dropped onto the canvas
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const file = e.dataTransfer.files[0];
+          
+          // Load JSON Flowchart
+          if (file.name.endsWith('.json')) {
+            loadFileToCanvas(file);
+            return;
+          } 
+          // Load Image File
+          else if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const img = new Image();
+              img.onload = () => {
+                const coords = getCanvasCoords(e);
+                // Smart auto-sizing for dropped images
+                let w = img.width;
+                let h = img.height;
+                if (w > 300) {
+                    h = h * (300 / w);
+                    w = 300;
+                }
+                setNodes(prev => [...prev, {
+                    id: generateId(),
+                    x: coords.x - w/2,
+                    y: coords.y - h/2,
+                    w: w,
+                    h: h,
+                    type: 'image',
+                    imageUrl: event.target.result
+                }]);
+              };
+              img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+            return;
+          }
+        }
+
+        // Load Dropped Shapes
         const type = e.dataTransfer.getData('nodeType');
         if (type) {
           const coords = getCanvasCoords(e);
           setNodes(prev => [...prev, {
             id: generateId(),
             x: coords.x - 60,
-            y: coords.y - 30,
-            w: type === 'decision' ? 140 : 120,
-            h: type === 'decision' ? 80 : 60,
+            y: coords.y - (type === 'decision' ? 60 : 30),
+            w: type === 'decision' ? 120 : 120,
+            h: type === 'decision' ? 120 : 60,
             text: type === 'decision' ? 'Decision' : 'Process',
             type
           }]);
@@ -364,6 +515,7 @@
       };
 
       const bb = getBoundingBox();
+      const isSingleDiamond = selectedNodeIds.length === 1 && nodes.find(n => n.id === selectedNodeIds[0])?.type === 'decision';
 
       return (
         <div className="flex flex-col h-screen bg-slate-100 text-slate-800 font-sans selection:bg-pink-100">
@@ -376,18 +528,21 @@
             </div>
             
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded border text-xs text-slate-500">
-                <Icons.Info className="w-4 h-4" />
-                <span>Select & hit <b>Shift + Right Arrow</b> to quick-add blocks!</span>
+
+              <div 
+                draggable="true" 
+                onDragStart={handleDragOutToSave}
+                onClick={handleSave}
+                className="drag-save-btn flex items-center gap-2 text-sm font-bold px-4 py-2 bg-blue-50 border-2 border-blue-200 rounded cursor-grab active:cursor-grabbing text-blue-700 hover:bg-blue-100 hover:scale-105 transition-all shadow-sm"
+                title="Drag me out of the window into a folder to instantly save! Or click to download normally."
+              >
+                <Icons.FileJson className="w-4 h-4" /> 
+                DRAG ME to a folder to Save!
               </div>
 
               <div className="h-6 w-px bg-slate-200 mx-2" />
               
-              <button onClick={handleSave} className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 hover:bg-slate-100 rounded text-slate-700 transition-colors">
-                <Icons.Download className="w-4 h-4" /> Save
-              </button>
-              
-              <label className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 hover:bg-slate-100 rounded text-slate-700 cursor-pointer transition-colors">
+              <label className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 hover:bg-slate-100 rounded text-slate-700 cursor-pointer transition-colors" title="Or just drag a .json file onto the canvas!">
                 <Icons.Upload className="w-4 h-4" /> Load
                 <input type="file" accept=".json" onChange={handleLoad} className="hidden" ref={fileInputRef} />
               </label>
@@ -412,7 +567,8 @@
             <aside className="w-64 bg-white border-r flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
               <div className="p-4 border-b bg-slate-50/50">
                 <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Shapes Library</h2>
-                <p className="text-xs text-slate-400 mt-1">Drag and drop into the drawing area</p>
+                <p className="text-xs text-slate-400 mt-1">Drag shapes to the canvas</p>
+                <p className="text-[10px] text-blue-500 font-bold mt-2 border border-blue-200 p-1.5 bg-blue-50 rounded">💡 Pro Tip: Drag a local image (.png, .jpg) onto the canvas to add it!</p>
               </div>
               
               <div className="p-4 flex flex-col gap-4">
@@ -438,30 +594,61 @@
 
             {/* Main Canvas Area */}
             <main 
-              className="flex-1 overflow-auto relative bg-[#F6F7F9]"
+              className="flex-1 overflow-hidden relative bg-slate-200 cursor-grab active:cursor-grabbing"
+              onDragEnter={handleDragEnterArea}
               onDragOver={(e) => e.preventDefault()}
+              onDragLeave={handleDragLeaveArea}
               onDrop={handleDrop}
+              onMouseDown={handleCanvasMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onContextMenu={(e) => e.preventDefault()}
+              style={{ 
+                backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 0)', 
+                backgroundSize: `${24 * transform.scale}px ${24 * transform.scale}px`,
+                backgroundPosition: `${transform.x}px ${transform.y}px`
+              }}
+              ref={canvasWrapperRef}
             >
-              {/* Infinite-like Canvas Container */}
+              
+              {/* Drag and Drop Visual Overlay */}
+              {isDraggingOver && (
+                <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-blue-100/80 border-4 border-blue-500 border-dashed backdrop-blur-sm pointer-events-none">
+                   <Icons.Upload className="w-20 h-20 text-blue-500 mb-4 animate-bounce" />
+                   <h2 className="text-4xl font-extrabold text-blue-600 tracking-tight shadow-sm">Drop .json or Images here!</h2>
+                   <p className="text-blue-500 font-medium mt-2">Release your mouse to instantly load them onto your canvas</p>
+                </div>
+              )}
+
+              {/* Zoom Controls Overlay */}
+              <div className="absolute bottom-6 left-6 flex items-center gap-1 bg-white p-1 rounded-lg shadow-md border border-slate-300 z-50 pointer-events-auto cursor-default">
+                <button onClick={() => setTransform(p => ({...p, scale: Math.max(p.scale / 1.2, 0.1)}))} className="p-1.5 hover:bg-slate-100 rounded text-slate-600" title="Zoom Out">
+                    <Icons.ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-bold w-12 text-center text-slate-600">{Math.round(transform.scale * 100)}%</span>
+                <button onClick={() => setTransform(p => ({...p, scale: Math.min(p.scale * 1.2, 5)}))} className="p-1.5 hover:bg-slate-100 rounded text-slate-600" title="Zoom In">
+                    <Icons.ZoomIn className="w-4 h-4" />
+                </button>
+                <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                <button onClick={() => setTransform({x:0, y:0, scale: 1})} className="px-2 py-1 hover:bg-slate-100 rounded text-[11px] font-bold text-slate-500 uppercase tracking-wider" title="Reset View">
+                    Reset
+                </button>
+              </div>
+
+              {/* Infinite Transformed Canvas Layer */}
               <div 
-                ref={canvasRef}
-                className="w-[3000px] h-[3000px] relative origin-top-left outline-none select-none"
-                style={{ 
-                  backgroundImage: 'radial-gradient(#D1D5DB 1px, transparent 0)', 
-                  backgroundSize: '24px 24px' 
-                }}
-                onMouseDown={handleCanvasMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
+                className="absolute inset-0 origin-top-left outline-none pointer-events-none"
+                style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }}
               >
                 
                 {/* SVG Layer for Edges and Selections */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+                <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-0">
                   <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                       <polygon points="0 0, 10 3.5, 0 7" fill="#ec4899" />
                     </marker>
-                    <marker id="arrowhead-connecting" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <marker id="arrowhead-connecting" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
                       <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
                     </marker>
                   </defs>
@@ -477,11 +664,21 @@
 
                     return (
                       <g key={edge.id}>
+                        {/* Invisible thicker path for easier double-clicking */}
+                        <path 
+                          d={`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`} 
+                          stroke="transparent" 
+                          strokeWidth="20" 
+                          className="pointer-events-auto cursor-text"
+                          onDoubleClick={(e) => { e.stopPropagation(); setEditingEdgeId(edge.id); }}
+                        />
+                        {/* Visible path */}
                         <path 
                           d={`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`} 
                           stroke="#ec4899" 
                           strokeWidth="1.5" 
                           markerEnd="url(#arrowhead)" 
+                          className="pointer-events-none"
                         />
                         {/* Edge Label (if any) */}
                         {(edge.text || editingEdgeId === edge.id) && (
@@ -543,13 +740,13 @@
                   )}
                 </svg>
 
-                {/* Nodes */}
+                {/* Nodes rendering loop */}
                 {nodes.map(node => {
                   const isSelected = selectedNodeIds.includes(node.id);
                   return (
                     <div 
                       key={node.id}
-                      className="absolute group z-10"
+                      className="absolute group z-10 pointer-events-auto"
                       style={{ 
                         left: node.x, 
                         top: node.y, 
@@ -558,13 +755,16 @@
                       }}
                       onMouseDown={(e) => handleNodeMouseDown(e, node.id)}
                       onMouseUp={(e) => handleNodeMouseUp(e, node.id)}
-                      onDoubleClick={(e) => { e.stopPropagation(); setEditingNodeId(node.id); }}
+                      onDoubleClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (node.type !== 'image') setEditingNodeId(node.id); 
+                      }}
                     >
                       
                       {/* Process (Rectangle) Rendering */}
                       {node.type === 'process' && (
                         <div className={`w-full h-full bg-white shadow-sm flex items-center justify-center p-2 text-center text-sm break-words leading-tight transition-shadow
-                          ${isSelected ? 'border-[2px] border-blue-500 shadow-blue-100' : 'border border-pink-500 hover:border-pink-600 hover:shadow-md'}`}>
+                          ${isSelected ? 'border-[2px] border-blue-500 shadow-blue-100' : 'border border-pink-500 group-hover:border-pink-600 group-hover:shadow-md'}`}>
                           {editingNodeId === node.id ? (
                             <textarea
                               autoFocus
@@ -582,13 +782,14 @@
                       {/* Decision (Diamond) Rendering */}
                       {node.type === 'decision' && (
                         <div className="w-full h-full relative">
-                          <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
+                          <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
                             <polygon 
                               points="50,0 100,50 50,100 0,50" 
                               fill="white" 
                               stroke={isSelected ? '#3b82f6' : '#ec4899'} 
                               strokeWidth={isSelected ? "4" : "2"} 
                               vectorEffect="non-scaling-stroke" 
+                              className={isSelected ? "shadow-blue-100" : "group-hover:stroke-pink-600"}
                             />
                           </svg>
                           <div className="absolute inset-0 flex items-center justify-center px-6 py-4 text-center text-sm leading-tight">
@@ -607,6 +808,13 @@
                         </div>
                       )}
 
+                      {/* Image Block Rendering */}
+                      {node.type === 'image' && (
+                        <div className={`w-full h-full relative bg-white/50 flex items-center justify-center ${isSelected ? 'outline outline-2 outline-blue-500 shadow-lg' : 'group-hover:outline group-hover:outline-2 group-hover:outline-pink-300'}`}>
+                          <img src={node.imageUrl} className="max-w-full max-h-full object-contain pointer-events-none" draggable="false" />
+                        </div>
+                      )}
+
                       {/* Connection Port Handles (Shows on hover or selection) */}
                       <div 
                         className={`absolute right-[-10px] top-1/2 -translate-y-1/2 w-5 h-5 bg-blue-500 rounded-full border-2 border-white shadow hover:scale-125 cursor-crosshair z-20 flex items-center justify-center text-white transition-all
@@ -619,10 +827,12 @@
                   );
                 })}
 
-                {/* Selection Bounding Box Resize Overlay (For Requirement 3) */}
-                {bb && selectedNodeIds.length > 1 && !draggingNodeInfo && (
+                {/* Selection Bounding Box Resize Overlay */}
+                {bb && selectedNodeIds.length >= 1 && !draggingNodeInfo && (
                   <div 
-                    className="absolute border border-blue-500 border-dashed pointer-events-none z-20"
+                    className={`absolute pointer-events-none z-20 ${
+                      isSingleDiamond ? 'border-transparent' : 'border border-blue-500 border-dashed'
+                    }`}
                     style={{ left: bb.x - 5, top: bb.y - 5, width: bb.w + 10, height: bb.h + 10 }}
                   >
                     {/* Bounding box resize handle */}
